@@ -42,6 +42,9 @@ router.post(['/login', '/login/'], async (req, res) => {
           designation: user.designation,
           mobile: user.mobile,
           role: user.role,
+          rmName: user.rmName,
+          gmName: user.gmName,
+          bdmName: user.bdmName,
         },
       });
     } else {
@@ -54,7 +57,7 @@ router.post(['/login', '/login/'], async (req, res) => {
 
 // @route   POST /emc/creatadmin/ (Register)
 router.post(['/creatadmin', '/register'], async (req, res) => {
-  const { name, email, email_id, password, designation, mobile, contact, role, employerId } = req.body;
+  const { name, email, email_id, password, designation, mobile, contact, role, employerId, rmName, gmName, bdmName } = req.body;
   const targetEmail = email || email_id;
   const targetEmployerId = employerId || req.body.employer_id;
 
@@ -84,6 +87,9 @@ router.post(['/creatadmin', '/register'], async (req, res) => {
       mobile: mobile || contact,
       city: req.body.city || '',
       role: assignedRole,
+      rmName: rmName || req.body.rm_name || '',
+      gmName: gmName || req.body.gm_name || '',
+      bdmName: bdmName || req.body.bdm_name || '',
     });
 
     res.status(201).json({
@@ -97,6 +103,9 @@ router.post(['/creatadmin', '/register'], async (req, res) => {
         designation: user.designation,
         mobile: user.mobile,
         role: user.role,
+        rmName: user.rmName,
+        gmName: user.gmName,
+        bdmName: user.bdmName,
       },
     });
   } catch (error) {
@@ -106,7 +115,7 @@ router.post(['/creatadmin', '/register'], async (req, res) => {
 
 // @route   POST /emc/createuser/ (Superadmin/Admin creates user or doctor)
 router.post(['/createuser', '/createuser/'], protect, async (req, res) => {
-  const { name, email, email_id, password, designation, mobile, contact, role, city } = req.body;
+  const { name, email, email_id, password, designation, mobile, contact, role, city, rmName, gmName, bdmName } = req.body;
   const targetEmail = email || email_id;
 
   try {
@@ -181,6 +190,9 @@ router.post(['/createuser', '/createuser/'], protect, async (req, res) => {
       mobile: mobile || contact,
       city: city || '',
       role: role || 'user',
+      rmName: rmName || req.body.rm_name || '',
+      gmName: gmName || req.body.gm_name || '',
+      bdmName: bdmName || req.body.bdm_name || '',
     });
 
     res.status(201).json({
@@ -216,7 +228,7 @@ router.post(['/deleteuser', '/deleteuser/'], protect, authorize('superadmin'), a
 
 // @route   POST /emc/updatepass/ (Update user info)
 router.post(['/updatepass', '/updatepass/'], protect, async (req, res) => {
-  const { userId, id, name, email, email_id, password, designation, mobile, contact, employerId } = req.body;
+  const { userId, id, name, email, email_id, password, designation, mobile, contact, employerId, rmName, gmName, bdmName } = req.body;
   const targetId = userId || id || req.user.id;
   const targetEmail = email || email_id;
 
@@ -237,6 +249,9 @@ router.post(['/updatepass', '/updatepass/'], protect, async (req, res) => {
     user.designation = designation || user.designation;
     user.mobile = mobile || contact || user.mobile;
     user.city = req.body.city || user.city;
+    user.rmName = rmName || req.body.rm_name || user.rmName;
+    user.gmName = gmName || req.body.gm_name || user.gmName;
+    user.bdmName = bdmName || req.body.bdm_name || user.bdmName;
 
     if (password) {
       const salt = await require('bcryptjs').genSalt(10);
@@ -322,39 +337,77 @@ router.post(['/bulk-admin-upload', '/bulk-admin-upload/'], protect, authorize('s
   try {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
-    const worksheet = workbook.getWorksheet(1); // Get first sheet
+    const worksheet = workbook.getWorksheet(1);
 
     const users = [];
     const errors = [];
 
-    // Skip header row
+    // 1. Map columns based on first row headers
+    const colMap = {};
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+      const val = String(cell.value || '').toLowerCase().trim();
+      console.log(`Column ${colNumber} header: "${val}"`);
+      
+      if (val === 'name') colMap.name = colNumber;
+      else if (val.includes('email')) colMap.email = colNumber;
+      else if (val.includes('code') || val.includes('employer')) colMap.employerId = colNumber;
+      else if (val.includes('rm name')) colMap.rmName = colNumber;
+      else if (val.includes('zm name') || val.includes('gm name')) colMap.gmName = colNumber;
+      else if (val.includes('bdm name')) colMap.bdmName = colNumber;
+      else if (val.includes('designation')) colMap.designation = colNumber;
+      else if (val.includes('hq') || val.includes('city')) colMap.city = colNumber;
+    });
+
+    console.log('Final Detected Column Map:', colMap);
+
+    const getVal = (row, colIndex) => {
+      if (!colIndex) return '';
+      const cell = row.getCell(colIndex);
+      if (cell.value && typeof cell.value === 'object' && cell.value.text) return String(cell.value.text).trim();
+      return String(cell.value || cell.text || '').trim();
+    };
+
+    // 2. Process data rows
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
 
-      // Extract and trim values safely
-      const name = String(row.getCell(1).value || row.getCell(1).text || '').trim();
-      const email = String(row.getCell(2).value || row.getCell(2).text || '').trim();
-      const employerId = String(row.getCell(3).value || row.getCell(3).text || '').trim();
-      const designation = String(row.getCell(4).value || row.getCell(4).text || 'Admin').trim();
-      const mobile = String(row.getCell(5).value || row.getCell(5).text || '').trim();
+      const employerId = getVal(row, colMap.employerId);
+      const name = getVal(row, colMap.name);
+      const email = getVal(row, colMap.email);
+      const designation = getVal(row, colMap.designation);
+      const city = getVal(row, colMap.city);
+      const rmName = getVal(row, colMap.rmName);
+      const gmName = getVal(row, colMap.gmName);
+      const bdmName = getVal(row, colMap.bdmName);
 
-      // Silently skip completely empty rows (common in Excel)
+      // Silently skip completely empty rows
       if (!name && !email && !employerId) return;
 
       if (!name || !email || !employerId) {
-        errors.push(`Row ${rowNumber}: Name, Email, and Employer ID are required.`);
+        errors.push(`Row ${rowNumber}: Name, Email, and Employee Code are required.`);
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errors.push(`Row ${rowNumber}: Invalid email format ("${email}") for user "${name}".`);
         return;
       }
 
       users.push({
         name,
-        email,
+        email: email.toLowerCase(),
         employerId,
-        password: employerId, // Password is same as employerId
         designation,
-        mobile,
+        mobile: '',
+        city,
+        rmName,
+        gmName,
+        bdmName,
         role: 'admin',
-        rowNumber // Track for logs
+        rowNumber,
+        password: employerId || 'Admin@123'
       });
     });
 

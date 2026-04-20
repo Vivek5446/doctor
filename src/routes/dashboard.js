@@ -233,7 +233,7 @@ router.get('/admin-report', protect, async (req, res) => {
         },
         {
           model: User,
-          attributes: ['name', 'email', 'employerId']
+          attributes: ['name', 'email', 'employerId', 'rmName', 'gmName', 'bdmName']
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -246,6 +246,9 @@ router.get('/admin-report', protect, async (req, res) => {
       { header: 'Admin Name', key: 'adminName', width: 25 },
       { header: 'Admin Email', key: 'adminEmail', width: 25 },
       { header: 'Admin Employer ID', key: 'adminEmpId', width: 20 },
+      { header: 'RM NAME', key: 'rmName', width: 20 },
+      { header: 'GM NAME', key: 'gmName', width: 20 },
+      { header: 'BDM NAME', key: 'bdmName', width: 20 },
       { header: 'Doctor Name', key: 'drName', width: 25 },
       { header: 'City', key: 'city', width: 15 },
       { header: 'Specialization', key: 'designation', width: 20 },
@@ -263,6 +266,9 @@ router.get('/admin-report', protect, async (req, res) => {
         adminName: v.User?.name || 'System',
         adminEmail: v.User?.email || 'N/A',
         adminEmpId: v.User?.employerId || 'N/A',
+        rmName: v.User?.rmName || 'N/A',
+        gmName: v.User?.gmName || 'N/A',
+        bdmName: v.User?.bdmName || 'N/A',
         drName: v.Doctor?.name || 'Unknown',
         city: v.Doctor?.city || 'Unknown',
         designation: v.Doctor?.designation || 'Unknown',
@@ -316,7 +322,7 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
         { 
           model: Doctor, 
           attributes: ['name', 'city', 'designation', 'userId'],
-          include: [{ model: User, attributes: ['name', 'email', 'employerId'] }]
+          include: [{ model: User, attributes: ['name', 'email', 'employerId', 'rmName', 'gmName', 'bdmName'] }]
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -329,6 +335,9 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
       { header: 'Admin Name', key: 'adminName', width: 25 },
       { header: 'Admin Email', key: 'adminEmail', width: 25 },
       { header: 'Admin Employer ID', key: 'adminEmpId', width: 20 },
+      { header: 'RM NAME', key: 'rmName', width: 20 },
+      { header: 'GM NAME', key: 'gmName', width: 20 },
+      { header: 'BDM NAME', key: 'bdmName', width: 20 },
       { header: 'Doctor Name', key: 'drName', width: 25 },
       { header: 'City', key: 'city', width: 15 },
       { header: 'Specialization', key: 'designation', width: 20 },
@@ -346,6 +355,9 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
         adminName: v.Doctor?.User?.name || 'System',
         adminEmail: v.Doctor?.User?.email || 'N/A',
         adminEmpId: v.Doctor?.User?.employerId || 'N/A',
+        rmName: v.Doctor?.User?.rmName || 'N/A',
+        gmName: v.Doctor?.User?.gmName || 'N/A',
+        bdmName: v.Doctor?.User?.bdmName || 'N/A',
         drName: v.Doctor?.name || 'Unknown',
         city: v.Doctor?.city || 'Unknown',
         designation: v.Doctor?.designation || 'Unknown',

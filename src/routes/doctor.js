@@ -292,13 +292,16 @@ router.post(['/report', '/report/'], protect, async (req, res) => {
       where,
       include: [
         { model: Doctor, attributes: ['name', 'city', 'designation'] },
-        { model: User, attributes: ['name'] }
+        { model: User, attributes: ['name', 'rmName', 'gmName', 'bdmName'] }
       ],
       order: [['createdAt', 'DESC']]
     });
 
     const data = videos.map(v => ({
       userName: v.User?.name || 'Unknown',
+      rmName: v.User?.rmName || '',
+      gmName: v.User?.gmName || '',
+      bdmName: v.User?.bdmName || '',
       drName: v.Doctor?.name || 'Unknown',
       city: v.Doctor?.city || '',
       designation: v.Doctor?.designation || '',
@@ -323,7 +326,7 @@ router.get('/report/:doctorId', protect, async (req, res) => {
     const { doctorId } = req.params;
 
     const doctor = await Doctor.findByPk(doctorId, {
-      include: [{ model: User, attributes: ['name', 'email', 'employerId'] }]
+      include: [{ model: User, attributes: ['name', 'email', 'employerId', 'rmName', 'gmName', 'bdmName'] }]
     });
     if (!doctor) {
       return res.status(404).json({ ok: false, success: false, message: 'Doctor not found' });
@@ -343,6 +346,9 @@ router.get('/report/:doctorId', protect, async (req, res) => {
       { header: 'Admin Name', key: 'adminName', width: 25 },
       { header: 'Admin Email', key: 'adminEmail', width: 25 },
       { header: 'Admin Employer ID', key: 'adminEmpId', width: 20 },
+      { header: 'RM NAME', key: 'rmName', width: 20 },
+      { header: 'GM NAME', key: 'gmName', width: 20 },
+      { header: 'BDM NAME', key: 'bdmName', width: 20 },
       { header: 'Doctor Name', key: 'drName', width: 25 },
       { header: 'City', key: 'city', width: 15 },
       { header: 'Specialization', key: 'designation', width: 20 },
@@ -363,6 +369,9 @@ router.get('/report/:doctorId', protect, async (req, res) => {
         adminName: admin?.name || 'System',
         adminEmail: admin?.email || 'N/A',
         adminEmpId: admin?.employerId || 'N/A',
+        rmName: admin?.rmName || 'N/A',
+        gmName: admin?.gmName || 'N/A',
+        bdmName: admin?.bdmName || 'N/A',
         drName: doctor.name,
         city: doctor.city,
         designation: doctor.designation,

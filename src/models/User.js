@@ -42,6 +42,18 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     defaultValue: 'user',
   },
+  rmName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  gmName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  bdmName: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
   tableName: 'users',
