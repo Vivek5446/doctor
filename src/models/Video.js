@@ -41,6 +41,10 @@ const Video = sequelize.define('Video', {
       key: 'id',
     },
   },
+  fromVideoService: {
+    type: DataTypes.STRING,
+    defaultValue: 'bunny',
+  },
 }, {
   timestamps: true,
   tableName: 'videos',

@@ -14,7 +14,7 @@ const Doctor = sequelize.define('Doctor', {
   },
   email: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     validate: {
       isEmail: true,
     },
@@ -23,6 +23,9 @@ const Doctor = sequelize.define('Doctor', {
     type: DataTypes.STRING,
   },
   city: {
+    type: DataTypes.STRING,
+  },
+  mobile: {
     type: DataTypes.STRING,
   },
   userId: {

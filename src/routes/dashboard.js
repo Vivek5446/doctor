@@ -206,6 +206,94 @@ router.get('/super-stats', protect, authorize('superadmin'), async (req, res) =>
 });
 
 /**
+ * @route   GET /api/dashboard/admin-report
+ * @desc    Admin-scoped Excel Audit for all their doctors (Date-Filtered Base64)
+ * @access  Private (Admins)
+ */
+router.get('/admin-report', protect, async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { startDate, endDate } = req.query;
+    const userId = req.user.id;
+
+    // Filter videos by the specific Admin's ownership
+    const whereClause = { userId };
+    if (startDate && endDate) {
+      whereClause.createdAt = {
+        [Sequelize.Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+
+    const videos = await Video.findAll({
+      where: whereClause,
+      include: [
+        { 
+          model: Doctor, 
+          attributes: ['name', 'city', 'designation'],
+        },
+        {
+          model: User,
+          attributes: ['name', 'email', 'employerId']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Admin Personnel Audit');
+
+    worksheet.columns = [
+      { header: 'Admin Name', key: 'adminName', width: 25 },
+      { header: 'Admin Email', key: 'adminEmail', width: 25 },
+      { header: 'Admin Employer ID', key: 'adminEmpId', width: 20 },
+      { header: 'Doctor Name', key: 'drName', width: 25 },
+      { header: 'City', key: 'city', width: 15 },
+      { header: 'Specialization', key: 'designation', width: 20 },
+      { header: 'Case Filename', key: 'fileName', width: 40 },
+      { header: 'Volume (MB)', key: 'sizeMb', width: 15 },
+      { header: 'Sync Date', key: 'uploadDate', width: 25 },
+    ];
+
+    worksheet.getRow(1).font = { bold: true };
+
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    videos.forEach(v => {
+      const absoluteUrl = v.fileUrl.startsWith('http') ? v.fileUrl : `${baseUrl}${v.fileUrl}`;
+      const row = worksheet.addRow({
+        adminName: v.User?.name || 'System',
+        adminEmail: v.User?.email || 'N/A',
+        adminEmpId: v.User?.employerId || 'N/A',
+        drName: v.Doctor?.name || 'Unknown',
+        city: v.Doctor?.city || 'Unknown',
+        designation: v.Doctor?.designation || 'Unknown',
+        fileName: v.fileName,
+        sizeMb: (v.fileSize / (1024 * 1024)).toFixed(2),
+        uploadDate: new Date(v.createdAt).toLocaleString()
+      });
+
+      // Transform filename into a clickable blue link
+      const cell = row.getCell('fileName');
+      cell.value = { text: v.fileName, hyperlink: absoluteUrl };
+      cell.font = { color: { argb: 'FF0000FF' }, underline: true };
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const base64 = buffer.toString('base64');
+
+    res.json({
+      ok: true,
+      success: true,
+      message: 'Admin audit synthesized successfully',
+      base64,
+      fileName: `Admin_Audit_${startDate || 'start'}_to_${endDate || 'end'}.xlsx`
+    });
+  } catch (error) {
+    console.error('Admin Report API Error:', error);
+    res.status(500).json({ ok: false, success: false, message: 'Admin audit failed.' });
+  }
+});
+
+/**
  * @route   GET /api/dashboard/super-report
  * @desc    High-Performance Platform-Wide Excel Audit (Date-Filtered Base64)
  * @access  Private (Superadmin Only)
@@ -228,7 +316,7 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
         { 
           model: Doctor, 
           attributes: ['name', 'city', 'designation', 'userId'],
-          include: [{ model: User, attributes: ['name'] }]
+          include: [{ model: User, attributes: ['name', 'email', 'employerId'] }]
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -239,9 +327,11 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
 
     worksheet.columns = [
       { header: 'Admin Name', key: 'adminName', width: 25 },
+      { header: 'Admin Email', key: 'adminEmail', width: 25 },
+      { header: 'Admin Employer ID', key: 'adminEmpId', width: 20 },
       { header: 'Doctor Name', key: 'drName', width: 25 },
       { header: 'City', key: 'city', width: 15 },
-      { header: 'Designation', key: 'designation', width: 20 },
+      { header: 'Specialization', key: 'designation', width: 20 },
       { header: 'Case Filename', key: 'fileName', width: 40 },
       { header: 'Volume (MB)', key: 'sizeMb', width: 15 },
       { header: 'Sync Date', key: 'uploadDate', width: 25 },
@@ -249,9 +339,13 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
 
     worksheet.getRow(1).font = { bold: true };
 
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     videos.forEach(v => {
-      worksheet.addRow({
+      const absoluteUrl = v.fileUrl.startsWith('http') ? v.fileUrl : `${baseUrl}${v.fileUrl}`;
+      const row = worksheet.addRow({
         adminName: v.Doctor?.User?.name || 'System',
+        adminEmail: v.Doctor?.User?.email || 'N/A',
+        adminEmpId: v.Doctor?.User?.employerId || 'N/A',
         drName: v.Doctor?.name || 'Unknown',
         city: v.Doctor?.city || 'Unknown',
         designation: v.Doctor?.designation || 'Unknown',
@@ -259,6 +353,11 @@ router.get('/super-report', protect, authorize('superadmin'), async (req, res) =
         sizeMb: (v.fileSize / (1024 * 1024)).toFixed(2),
         uploadDate: new Date(v.createdAt).toLocaleString()
       });
+
+      // Transform filename into a clickable blue link
+      const cell = row.getCell('fileName');
+      cell.value = { text: v.fileName, hyperlink: absoluteUrl };
+      cell.font = { color: { argb: 'FF0000FF' }, underline: true };
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
