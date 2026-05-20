@@ -6,6 +6,8 @@ const sequelize = require('./config/database');
 // Load models
 require('./models/User');
 require('./models/Doctor');
+require('./models/PrescriptionDoctor');
+require('./models/Prescription');
 
 dotenv.config();
 
@@ -13,13 +15,18 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+
 
 // Routes
 app.use('/emc', require('./routes/auth'));
 app.use('/emc', require('./routes/doctor'));
 app.use('/api/doctors', require('./routes/doctor'));
 app.use('/api/dashboard', require('./routes/dashboard')); // Dedicated Executive Activity Stream
+app.use('/api/prescription-doctors', require('./routes/prescriptionDoctor'));
+app.use('/api/prescriptions', require('./routes/prescription'));
 
 // Basic route
 app.get('/', (req, res) => {
@@ -73,10 +80,14 @@ const seedAdmin = async () => {
 require('./models/User');
 require('./models/Doctor');
 require('./models/Video');
+require('./models/PrescriptionDoctor');
+require('./models/Prescription');
 
 sequelize.sync({ alter: true })
   .then(async () => {
     console.log('Database synced successfully.');
+    // Drop the strict foreign key constraint if it exists to allow unhindered bulk imports
+    await sequelize.query('ALTER TABLE prescription_doctors DROP CONSTRAINT IF EXISTS "prescription_doctors_empId_fkey" CASCADE;').catch(() => {});
     await seedAdmin();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

@@ -3,6 +3,8 @@ const router = express.Router();
 const User = require('../models/User');
 const Doctor = require('../models/Doctor');
 const Video = require('../models/Video');
+const PrescriptionDoctor = require('../models/PrescriptionDoctor');
+const Prescription = require('../models/Prescription');
 const { protect, authorize } = require('../middleware/auth');
 const { Sequelize } = require('sequelize');
 
@@ -61,6 +63,17 @@ router.get('/stats', protect, async (req, res) => {
     // 4. Portfolio Summary - Locally Filtered
     const totalDoctors = await Doctor.count({ where: whereClause });
     const totalVideos = await Video.count({ where: whereClause });
+    const totalPrescriptions = await Prescription.count({ where: whereClause });
+
+    const recentPrescriptions = await Prescription.findAll({
+      where: whereClause,
+      limit: 5,
+      order: [['createdAt', 'DESC']],
+      include: [
+        { model: PrescriptionDoctor, attributes: ['doctorName', 'uidNumber'] },
+        { model: User, attributes: ['name'] }
+      ]
+    });
 
     // 5. Specialization & City Analytics (Server-side Aggregation)
     const specializations = await Doctor.findAll({
@@ -107,9 +120,28 @@ router.get('/stats', protect, async (req, res) => {
       activeDoctorsCount,
       totalDoctors,
       totalVideos,
+      totalPrescriptions,
       portfolioStatus: totalVideos > 0 ? 'Growing' : 'Awaiting Data',
       lastUpdate: new Date(),
-      viewScope: isSuperAdmin ? 'Global' : 'Personal'
+      viewScope: isSuperAdmin ? 'Global' : 'Personal',
+      recentPrescriptions: recentPrescriptions.map(p => {
+        let absoluteUrl = p.imageUrl;
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        if (!p.imageUrl.startsWith('http')) {
+           absoluteUrl = `${baseUrl}/api/prescriptions/image/${p.imageUrl.split('/').pop()}`;
+        } else if (p.imageUrl.includes('bunnycdn')) {
+           const filename = p.imageUrl.split('/').pop();
+           absoluteUrl = `${baseUrl}/api/prescriptions/image/${filename}`;
+        }
+        return {
+          id: p.id,
+          imageUrl: absoluteUrl,
+          doctorName: p.PrescriptionDoctor?.doctorName || 'Unknown',
+          uidNumber: p.PrescriptionDoctor?.uidNumber || 'N/A',
+          adminName: p.User?.name || 'System',
+          uploadedAt: p.createdAt
+        };
+      })
     };
 
     res.json({
@@ -145,7 +177,10 @@ router.get('/super-stats', protect, authorize('superadmin'), async (req, res) =>
       specializations,
       cities,
       recentDoctors,
-      recentVideos
+      recentVideos,
+      totalPrescriptionDoctors,
+      totalPrescriptions,
+      recentPrescriptions
     ] = await Promise.all([
       User.count(),
       User.count({ where: { role: 'admin' } }),
@@ -175,6 +210,16 @@ router.get('/super-stats', protect, authorize('superadmin'), async (req, res) =>
         limit: 5,
         order: [['createdAt', 'DESC']],
         include: [{ model: Doctor, attributes: ['name', 'city'] }]
+      }),
+      PrescriptionDoctor.count(),
+      Prescription.count(),
+      Prescription.findAll({
+        limit: 5,
+        order: [['createdAt', 'DESC']],
+        include: [
+          { model: PrescriptionDoctor, attributes: ['doctorName', 'uidNumber'] },
+          { model: User, attributes: ['name'] }
+        ]
       })
     ]);
 
@@ -186,6 +231,8 @@ router.get('/super-stats', protect, authorize('superadmin'), async (req, res) =>
         totalAdmins,
         totalDoctors,
         totalVideos,
+        totalPrescriptions,
+        totalPrescriptionDoctors,
         specializationSeries: specializations.map(s => ({ label: s.designation || 'General', value: parseInt(s.get('count')) })),
         citySeries: cities.map(c => ({ label: c.city || 'Unknown', value: parseInt(c.get('count')) })),
         recentDoctors,
@@ -196,7 +243,25 @@ router.get('/super-stats', protect, authorize('superadmin'), async (req, res) =>
           doctorName: v.Doctor?.name || 'Unknown',
           city: v.Doctor?.city || 'Unknown',
           uploadedAt: v.createdAt
-        }))
+        })),
+        recentPrescriptions: recentPrescriptions.map(p => {
+          let absoluteUrl = p.imageUrl;
+          const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+          if (!p.imageUrl.startsWith('http')) {
+             absoluteUrl = `${baseUrl}/api/prescriptions/image/${p.imageUrl.split('/').pop()}`;
+          } else if (p.imageUrl.includes('bunnycdn')) {
+             const filename = p.imageUrl.split('/').pop();
+             absoluteUrl = `${baseUrl}/api/prescriptions/image/${filename}`;
+          }
+          return {
+            id: p.id,
+            imageUrl: absoluteUrl,
+            doctorName: p.PrescriptionDoctor?.doctorName || 'Unknown',
+            uidNumber: p.PrescriptionDoctor?.uidNumber || 'N/A',
+            adminName: p.User?.name || 'System',
+            uploadedAt: p.createdAt
+          };
+        })
       }
     });
   } catch (error) {
