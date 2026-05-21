@@ -234,11 +234,11 @@ router.get('/', protect, async (req, res) => {
     }
 
     // Role safety check: standard users should only see their assigned doctors
-    const role = String(req.user.role || '').toLowerCase();
-    const isSuperAdmin = role === 'superadmin' || role === 'super_admin';
-    if (!isSuperAdmin) {
-      query.empId = req.user.employerId;
-    }
+    // const role = String(req.user.role || '').toLowerCase();
+    // const isSuperAdmin = role === 'superadmin' || role === 'super_admin';
+    // if (!isSuperAdmin) {
+    //   query.empId = req.user.employerId;
+    // }
 
     const { count, rows: doctors } = await PrescriptionDoctor.findAndCountAll({
       where: query,
